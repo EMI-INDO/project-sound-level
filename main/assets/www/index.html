@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sound Level Swiftlet</title>
+  <script src="cordova.js"></script>
+  <script src="js/initAdmob.js" defer></script>
+  <script src="js/iniFirebase.js" defer></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <!-- Firebase CDN (versi compat agar API-nya mirip versi sebelumnya) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-analytics-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-remote-config-compat.js"></script>
+
+  <style>
+    /* Reset style dan box-sizing */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      color: #333;
+    }
+
+    .container {
+      position: relative;
+      width: 100%;
+      max-width: 600px;
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Dropdown language ditempatkan di pojok kanan atas */
+    .lang-dropdown {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+    }
+
+    .lang-dropdown select {
+      padding: 4px 8px;
+      font-size: 14px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #444;
+    }
+
+    #status {
+      margin: 20px 0;
+      font-size: 18px;
+      text-align: center;
+      padding: 10px;
+      background: #e9ecef;
+      border-radius: 4px;
+    }
+
+    /* Statistik */
+    #statistics {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 20px 0;
+      padding: 10px;
+      background-color: #f8f9fa;
+      border-radius: 8px;
+    }
+
+    #statistics p {
+      flex: 1 1 calc(50% - 10px);
+      background: #ffffff;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      text-align: center;
+      font-size: 16px;
+      color: #333;
+    }
+
+    #statistics p span {
+      font-weight: bold;
+      color: #007bff;
+    }
+
+    /* Tombol dan input utama */
+    button,
+    input[type="number"] {
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 4px;
+      transition: background-color 0.3s ease;
+    }
+
+    button {
+      cursor: pointer;
+      background-color: #007bff;
+      color: #fff;
+    }
+
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+
+    /* Grup input: label, input, dan tombol icon */
+    .input-group {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-left: 20px;
+      margin-top: 20px;
+      padding: 8px;
+      width: 90%;
+    }
+
+    .input-group label {
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    /* Tentukan lebar input secara eksplisit agar konsisten */
+    .input-group input {
+      flex: 0 0 80px;
+      padding: 6px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    /* Gaya tombol khusus untuk icon, agar lebarnya tidak memanjang */
+    .input-group button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 6px;
+      background-color: #4CAF50;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      min-width: auto;
+      max-width: 30px;
+    }
+
+    .input-group button i {
+      pointer-events: none;
+      font-size: 18px;
+    }
+
+    /* Bar indikator */
+    #barContainer {
+      width: 100%;
+      max-width: 400px;
+      height: 50px;
+      margin: 20px auto;
+      border: 2px solid #ddd;
+      background-color: #f0f0f0;
+      position: relative;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    #bar {
+      height: 100%;
+      width: 0;
+      position: absolute;
+      left: 0;
+      background-color: black;
+      transition: background-color 0.2s, width 0.1s;
+    }
+
+    /* Tampilan gelombang suara */
+    #waveformContainer {
+      width: 100%;
+      height: 150px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      margin: 20px 0;
+      background: #f9f9f9;
+      overflow: hidden;
+    }
+
+    #waveformCanvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Area log disembunyikan */
+    #logArea {
+      display: none;
+    }
+
+    /* Tombol group */
+    .button-group {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    #heading {
+      margin-right: 50px;
+      font-size: 22px;
+    }
+
+    #overlayNotification {
+      display: none;
+      position: fixed;
+      top: 150px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: rgba(26, 18, 180, 0.8);
+      color: #f9f7f7;
+      padding: 15px 25px;
+      border-radius: 5px;
+      font-size: 14px;
+      z-index: 1000;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    #overlayNotification2 {
+      display: none;
+      position: fixed;
+      top: 150px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: rgba(231, 55, 6, 0.8);
+      color: #f9f7f7;
+      padding: 15px 25px;
+      border-radius: 5px;
+      font-size: 14px;
+      z-index: 1000;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Responsif untuk perangkat mobile */
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+
+      .container {
+        padding: 10px;
+      }
+
+      button,
+      input[type="number"] {
+        width: 100%;
+        max-width: 300px;
+      }
+
+      #barContainer {
+        max-width: 300px;
+      }
+
+      #statistics p {
+        flex: 1 1 100%;
+      }
+
+      .input-group {
+        flex-direction: row;
+      }
+
+      .lang-dropdown {
+        top: 10px;
+        right: 10px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <!-- Dropdown bahasa di pojok kanan atas -->
+    <div class="lang-dropdown">
+      <select id="languageSelect">
+        <option value="en">English</option>
+        <option value="id">Indonesia</option>
+      </select>
+    </div>
+    <h1 id="heading">Sound Meter Swiftlet</h1>
+    <p id="status">Press the button to start or stop sound measurement.</p>
+
+    <div id="statistics">
+      <p id="minText">Min: <span id="minDb">0</span> dB</p>
+      <p id="avgText">Average: <span id="avgDb">0</span> dB</p>
+      <p id="maxText">Max: <span id="maxDb">0</span> dB</p>
+      <p id="currentText">Current: <span id="currentDb">0</span> dB</p>
+      <p id="smoothedText">Current (Smoothed): <span id="currentSlowDb">0</span> dB</p>
+    </div>
+
+    <div class="button-group">
+      <button id="startBtn">Start Recording</button>
+      <button id="stopBtn" disabled>Stop Recording</button>
+    </div>
+
+    <div class="input-group">
+      <label for="dbPlusInput" id="dbPlusLabel">Min-dB</label>
+      <input type="number" id="dbPlusInput" placeholder="dB" />
+      <!-- Tombol icon untuk simpan -->
+      <button id="saveDbPlusBtn" title="Save">
+        <i class="fas fa-save"></i>
+      </button>
+    </div>
+
+    <!-- Teks kondisi di atas bar -->
+    <p id="conditionText" style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 10px;"></p>
+
+    <div id="barContainer">
+      <div id="bar"></div>
+    </div>
+
+    <div id="overlayNotification">No internet connection</div>
+    <div id="overlayNotification2"></div>
+
+    <div id="waveformContainer">
+      <canvas id="waveformCanvas" width="1000" height="150"></canvas>
+    </div>
+
+    <textarea id="logArea" rows="10" cols="50" readonly></textarea>
+  </div>
+
+  <script>
+    // Translations object
+    const translations = {
+      en: {
+        heading: "Sound Meter Swiftlet",
+        status: "Press the button to start or stop sound measurement.",
+        startBtn: "Start Recording",
+        stopBtn: "Stop Recording",
+        dbPlusLabel: "Min-dB",
+        saveSuccess: (dbPlus) => `dB value (${dbPlus}) has been saved.`,
+        invalidInput: "Please enter a valid number.",
+        condition: {
+          standardInaction: "standard child noise",
+          highInaction: "High child noise",
+          standardCallPull: "standard noise calling sound",
+          highCallPull: "High noise calling sound",
+          highPlusCallPull: "Call sound with too high noise",
+          highOverCallPull: "Overkill",
+          checkAppVersions: "New version of the app available on the Play Store",
+          showOfflineNotifications: "No internet connection"
+        },
+        statistics: {
+          min: "Min:",
+          average: "Average:",
+          max: "Max:",
+          current: "Current:",
+          smoothed: "Current (Smoothed):"
+        }
+      },
+      id: {
+        heading: "Meter Suara walet",
+        status: "Tekan tombol untuk mulai atau berhenti pengukuran suara.",
+        startBtn: "Mulai Merekam",
+        stopBtn: "Berhenti Merekam",
+        dbPlusLabel: "Min-dB",
+        saveSuccess: (dbPlus) => `Nilai dB (${dbPlus}) telah disimpan.`,
+        invalidInput: "Silakan masukkan angka yang valid.",
+        condition: {
+          standardInaction: "Kebisingan inap standar",
+          highInaction: "Kebisingan inap tinggi",
+          standardCallPull: "Kebisingan panggil/tarik standar",
+          highCallPull: "Kebisingan panggil/tarik tinggi",
+          highPlusCallPull: "Kebisingan panggil/tarik terlalu tinggi",
+          highOverCallPull: "Kebisingan Berlebihan over",
+          checkAppVersions: "Aplikasi versi baru tersedia di Play Store",
+          showOfflineNotifications: "Tidak ada koneksi internet"
+        },
+        statistics: {
+          min: "Min:",
+          average: "Rata-rata:",
+          max: "Max:",
+          current: "Saat Ini:",
+          smoothed: "Saat Ini (Halus):"
+        }
+      }
+    };
+
+    // Fungsi untuk mengupdate teks UI berdasarkan bahasa yang dipilih
+    function updateLanguage(lang) {
+      const t = translations[lang];
+      document.getElementById("heading").textContent = t.heading;
+      document.getElementById("status").textContent = t.status;
+      document.getElementById("startBtn").textContent = t.startBtn;
+      document.getElementById("stopBtn").textContent = t.stopBtn;
+      document.getElementById("dbPlusLabel").textContent = t.dbPlusLabel;
+      // Update teks statistik
+      document.getElementById("minText").firstChild.textContent = t.statistics.min + " ";
+      document.getElementById("avgText").firstChild.textContent = t.statistics.average + " ";
+      document.getElementById("maxText").firstChild.textContent = t.statistics.max + " ";
+      document.getElementById("currentText").firstChild.textContent = t.statistics.current + " ";
+      document.getElementById("smoothedText").firstChild.textContent = t.statistics.smoothed + " ";
+    }
+
+    // Baca bahasa yang tersimpan di localStorage (default English)
+    const savedLang = localStorage.getItem("language") || "en";
+    document.getElementById("languageSelect").value = savedLang;
+    updateLanguage(savedLang);
+
+    // Event listener untuk dropdown bahasa
+    document.getElementById("languageSelect").addEventListener("change", function () {
+      const selectedLang = this.value;
+      localStorage.setItem("language", selectedLang);
+      updateLanguage(selectedLang);
+    });
+
+    document.addEventListener('deviceready', function () {
+      const statusElement = document.getElementById('status');
+      const minDbElement = document.getElementById('minDb');
+      const avgDbElement = document.getElementById('avgDb');
+      const maxDbElement = document.getElementById('maxDb');
+      const currentDbElement = document.getElementById('currentDb');
+      const currentSlowDbElement = document.getElementById('currentSlowDb');
+      const dbPlusInput = document.getElementById('dbPlusInput');
+      const saveDbPlusBtn = document.getElementById('saveDbPlusBtn');
+      const startBtn = document.getElementById('startBtn');
+      const stopBtn = document.getElementById('stopBtn');
+      const bar = document.getElementById('bar');
+      const conditionTextElement = document.getElementById('conditionText');
+
+      updateButtonStatus();
+
+      callFirebase();
+
+      window.addEventListener("online", function () {
+        // console.log("Online event terpicu (window)");
+        updateButtonStatus();
+      }, false);
+
+      window.addEventListener("offline", function () {
+        // console.log("Offline event terpicu (window)");
+        updateButtonStatus();
+      }, false);
+
+
+
+
+
+
+
+      // Fungsi untuk mengupdate status button berdasarkan koneksi
+      function updateButtonStatus() {
+
+        let conditionMessage = "";
+        // Menggunakan kondisi sesuai nilai dan menerjemahkan berdasarkan bahasa yang aktif
+        const currentLang = document.getElementById("languageSelect").value;
+        const cond = translations[currentLang].condition;
+
+        var btn = startBtn;
+        var networkState = navigator.connection.type;
+        //console.log("Tipe koneksi: " + networkState);
+        if (networkState === Connection.NONE) {
+          btn.disabled = true;
+          conditionMessage = cond.showOfflineNotifications;
+          showOfflineNotification(conditionMessage);
+          // alert("Tidak ada koneksi internet: Button dinonaktifkan.");
+        } else {
+          btn.disabled = false;
+          admobStart();
+          loadShowInterstisialAd();
+          // console.log("Koneksi internet tersedia: Button diaktifkan.");
+        }
+
+      }
+
+
+
+      function showOfflineNotification(message) {
+        var overlay = document.getElementById("overlayNotification2");
+        overlay.innerText = message;
+        overlay.style.display = "block";
+        setTimeout(function () {
+          overlay.style.display = "none";
+        }, 5000);
+      }
+
+
+
+      // Muat nilai dB+ dari localStorage
+      let dbPlus = parseFloat(localStorage.getItem('dbPlus')) || 10;
+      dbPlusInput.value = dbPlus;
+
+      let minDb = Infinity, maxDb = -Infinity, totalDb = 0, sampleCount = 0;
+      let currentSlowDb = 0;
+      const smoothingFactor = 0.2;
+
+      function updateBar(slowDb) {
+        const width = Math.min((slowDb / 130) * 100, 100);
+        bar.style.width = `${width}%`;
+
+        let conditionMessage = "";
+        // Menggunakan kondisi sesuai nilai dan menerjemahkan berdasarkan bahasa yang aktif
+        const currentLang = document.getElementById("languageSelect").value;
+        const cond = translations[currentLang].condition;
+
+        if (slowDb > 95 && slowDb <= 100) {
+          // slowDb kebisingan suara di dalam ruangan/ kebisingan suara inap standar
+          conditionMessage = cond.standardInaction;
+          bar.style.backgroundColor = 'green';
+        } else if (slowDb > 100 && slowDb <= 112) {
+          // slowDb kebisingan suara di dalam ruangan/ kebisingan suara inap tinggi
+          conditionMessage = cond.highInaction;
+          bar.style.backgroundColor = 'blue';
+        } else if (slowDb > 118 && slowDb <= 120) {
+          // slowDb kebisingan suara di luar ruangan/ kebisingan suara panggil standar
+          conditionMessage = cond.standardCallPull;
+          bar.style.backgroundColor = 'pink';
+        } else if (slowDb > 120 && slowDb <= 125) {
+          // slowDb kebisingan suara di luar ruangan/ kebisingan suara panggil tinggi
+          conditionMessage = cond.highCallPull;
+          bar.style.backgroundColor = 'orange';
+        } else if (slowDb <= 80) {
+          bar.style.backgroundColor = 'black';
+        } else if (slowDb > 80 && slowDb <= 95) {
+          bar.style.backgroundColor = 'yellow';
+        } else if (slowDb > 125 && slowDb <= 130) {
+          // slowDb kebisingan suara di luar ruangan/ kebisingan suara panggil terlalu tinggi
+          bar.style.backgroundColor = 'red';
+          conditionMessage = cond.highPlusCallPull;
+        } else if (slowDb > 130) {
+          // slowDb kebisingan tidak disarankan ini dapat merusak tweeter atau amplifier 
+          bar.style.backgroundColor = 'black';
+          conditionMessage = cond.highOverCallPull;
+        }
+        conditionTextElement.innerText = conditionMessage;
+        conditionTextElement.style.color = bar.style.backgroundColor;
+      }
+
+      const canvas = document.getElementById('waveformCanvas');
+      const ctx = canvas.getContext('2d');
+      const waveformData = [];
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+      const middle = canvasHeight / 2;
+      const maxWaveformPoints = canvasWidth;
+
+      function drawWaveform() {
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+        ctx.beginPath();
+        ctx.moveTo(0, middle);
+        for (let i = 0; i < waveformData.length; i++) {
+          const amplitude = waveformData[i];
+          const x = i;
+          const y = middle - (amplitude / 100) * middle;
+          ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = '#007bff';
+        ctx.stroke();
+      }
+
+      function addWaveformPoint(point) {
+        if (waveformData.length >= maxWaveformPoints) {
+          waveformData.shift();
+        }
+        waveformData.push(point);
+        drawWaveform();
+      }
+
+      function saveDbPlusValue() {
+        const inputValue = parseFloat(dbPlusInput.value);
+        const currentLang = document.getElementById("languageSelect").value;
+        if (!isNaN(inputValue)) {
+          dbPlus = inputValue;
+          localStorage.setItem('dbPlus', dbPlus);
+          alert(translations[currentLang].saveSuccess(dbPlus));
+        } else {
+          alert(translations[currentLang].invalidInput);
+        }
+      }
+
+
+
+
+
+      saveDbPlusBtn.addEventListener('click', saveDbPlusValue);
+
+      // Ambil nilai dari localStorage, jika belum ada inisialisasi dengan 0
+      let interstitialCounter = localStorage.getItem("interstitialCounter")
+        ? parseInt(localStorage.getItem("interstitialCounter"), 10)
+        : 0;
+
+      let isInterstitialLoad = false;
+
+      startBtn.addEventListener('click', function () {
+        statusElement.textContent = translations[document.getElementById("languageSelect").value].status;
+        stopBtn.disabled = false;
+        startBtn.disabled = true;
+        cordova.plugins.SoundMeter.start(
+          function (result) {
+            const data = JSON.parse(result);
+            const { current } = data;
+            const adjustedCurrent = current + dbPlus;
+            const adjustedMin = Math.min(minDb, data.min + dbPlus);
+            const adjustedMax = Math.max(maxDb, data.max + dbPlus);
+
+            minDb = adjustedMin;
+            maxDb = adjustedMax;
+            totalDb += adjustedCurrent;
+            sampleCount++;
+
+            minDbElement.textContent = adjustedMin.toFixed(2);
+            avgDbElement.textContent = (totalDb / sampleCount).toFixed(2);
+            maxDbElement.textContent = adjustedMax.toFixed(2);
+            currentDbElement.textContent = adjustedCurrent.toFixed(2);
+
+            currentSlowDb = currentSlowDb * (1 - smoothingFactor) + adjustedCurrent * smoothingFactor;
+            currentSlowDbElement.textContent = currentSlowDb.toFixed(2);
+            updateBar(currentSlowDb);
+            addWaveformPoint(current);
+
+            // Update counter dengan penjumlahan, simpan ke localStorage juga
+
+
+            // Cek jika iklan sudah load dan counter melebihi batas (misal 3)
+            if (isInterstitialLoad && interstitialCounter >= 5) {
+                showInterstitial();
+            }
+
+
+
+          },
+          function (error) {
+            statusElement.textContent = `Error: ${error}`;
+            stopBtn.disabled = true;
+            startBtn.disabled = false;
+          }
+        );
+      });
+
+
+
+      document.addEventListener('on.interstitial.loaded', () => {
+        isInterstitialLoad = true;
+        console.log("on interstitial Ad loaded");
+
+      });
+
+
+      function loadShowInterstisialAd() {
+
+        if (typeof cordova !== 'undefined') {
+// ca-app-pub-3940256099942544/1033173712
+// ca-app-pub-3984445762619233/7321467107
+          cordova.plugins.emiAdmobPlugin.loadInterstitialAd({ adUnitId: "ca-app-pub-3984445762619233/7321467107", autoShow: false });
+
+        }
+      }
+
+
+
+      function showInterstitial() {
+
+        if (typeof cordova !== 'undefined') {
+
+          if (isInterstitialLoad) {
+            cordova.plugins.emiAdmobPlugin.showInterstitialAd();
+          }
+        }
+
+      }
+
+
+
+      document.addEventListener('on.interstitial.dismissed', () => {
+        isInterstitialLoad = false;
+
+        // Reset nilai counter yang tersimpan di localStorage dan variabel lokal
+        interstitialCounter = 0;
+        localStorage.setItem("interstitialCounter", 0);
+
+        loadShowInterstisialAd();
+
+      });
+
+
+
+
+
+      stopBtn.addEventListener('click', function () {
+        statusElement.textContent = "Measurement stopped.";
+        stopBtn.disabled = true;
+        startBtn.disabled = false;
+        cordova.plugins.SoundMeter.stop(
+          function (message) {
+            statusElement.textContent = message;
+            bar.style.width = "0";
+            bar.style.backgroundColor = "black";
+            conditionTextElement.innerText = "";
+          },
+          function (error) {
+            statusElement.textContent = `Error: ${error}`;
+          }
+        );
+
+        interstitialCounter += 1;
+        localStorage.setItem("interstitialCounter", interstitialCounter);
+
+      });
+    });
+  </script>
+</body>
+
+</html>
