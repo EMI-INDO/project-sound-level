@@ -44,13 +44,10 @@ jobs:
           password: ${{ steps.get_token.outputs.token }}
 
       # Langkah 3: Jalankan Build Engine dari Container Privat Anda
-      - name: Build Cordova Project via Secure Engine  # <-- INDENTASI DIPERBAIKI
+      - name: Build Cordova Project via Secure Engine
         run: |
           docker run --rm \
-          -e INPUT_APPBASEURL=${{ github.event.inputs.appBaseUrl }} \
-          -e INPUT_BUILDID=${{ github.event.inputs.buildId }} \
-          -e INPUT_BUILDTOKEN=${{ github.event.inputs.buildToken }} \
-          -e GITHUB_SERVER_URL=${{ github.server_url }} \
-          -e GITHUB_REPOSITORY=${{ github.repository }} \
-          -e GITHUB_RUN_ID=${{ github.run_id }} \
-          ghcr.io/swaplab-engine/cordova-build-engine:main
+            -e APP_BASE_URL=${{ github.event.inputs.appBaseUrl }} \
+            -e BUILD_ID=${{ github.event.inputs.buildId }} \
+            -e BUILD_TOKEN=${{ github.event.inputs.buildToken }} \
+            ghcr.io/swaplab-engine/cordova-build-engine:main
