@@ -1,0 +1,41 @@
+# Nama file: .github/workflows/cordova-build.yml
+name: Cordova Build Service
+
+on:
+  workflow_dispatch:
+    inputs:
+      appBaseUrl:
+        required: true
+      buildId:
+        required: true
+      buildToken:
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Checkout Private Build Engine
+        uses: actions/checkout@v4
+        with:
+          repository: swaplab-engine/cordova-build-engine
+          token: ${{ secrets.ACTION_PAT }}
+          path: '.github/actions/build-engine'
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Cordova Project via Secure Engine
+        uses: ./.github/actions/build-engine
+        with:
+          appBaseUrl: ${{ github.event.inputs.appBaseUrl }}
+          buildId: ${{ github.event.inputs.buildId }}
+          buildToken: ${{ github.event.inputs.buildToken }}
