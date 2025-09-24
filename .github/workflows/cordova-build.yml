@@ -16,32 +16,44 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      # Langkah 1: Minta token dengan action yang sudah disederhanakan
-      - name: Request short-lived GHCR token
-        id: get_token_step  # Beri ID pada langkah ini
-        uses: swaplab-engine/cordova-build-engine@main
-        with:
-          appBaseUrl: ${{ github.event.inputs.appBaseUrl }}
-          buildId: ${{ github.event.inputs.buildId }}
-          buildToken: ${{ github.event.inputs.buildToken }}
 
-      # Langkah 2: Login ke GHCR (HAMPIR SAMA, HANYA MENGUBAH CARA MENGAMBIL PASSWORD)
+      # Langkah 1: Minta token akses jangka pendek dari server Anda
+      - name: Request short-lived GHCR token
+        id: get_token
+        run: |
+          token=$(curl -s -f -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ github.event.inputs.buildToken }}" \
+            -d '{
+                  "buildId": "${{ github.event.inputs.buildId }}"
+                }' \
+            ${{ github.event.inputs.appBaseUrl }}/api/request-ghcr-token | jq -r .ghcrToken)
+          
+          if [ -z "$token" ]; then
+            echo "::error::Failed to retrieve a valid token from the server."
+            exit 1
+          fi
+
+          echo "token=$token" >> $GITHUB_OUTPUT
+
+      # Langkah 2: Login ke GHCR menggunakan token yang baru didapat
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
-          # Ambil password dari output action di Langkah 1
-          password: ${{ steps.get_token_step.outputs.token }}
+          password: ${{ steps.get_token.outputs.token }}
 
-      # Langkah 3: Jalankan Build Engine (TIDAK ADA PERUBAHAN SAMA SEKALI)
-      - name: Build Cordova Project via Secure Engine
+      # Langkah 3: Jalankan Build Engine dari Container Privat Anda
+      - name: Build Cordova Project via Secure Engine  # <-- INDENTASI DIPERBAIKI
         run: |
           docker run --rm \
-            -e INPUT_APPBASEURL=${{ github.event.inputs.appBaseUrl }} \
-            -e INPUT_BUILDID=${{ github.event.inputs.buildId }} \
-            -e INPUT_BUILDTOKEN=${{ github.event.inputs.buildToken }} \
-            -e GITHUB_SERVER_URL=${{ github.server_url }} \
-            -e GITHUB_REPOSITORY=${{ github.repository }} \
-            -e GITHUB_RUN_ID=${{ github.run_id }} \
-            ghcr.io/swaplab-engine/cordova-build-engine:main
+          -e INPUT_APPBASEURL=${{ github.event.inputs.appBaseUrl }} \
+          -e INPUT_BUILDID=${{ github.event.inputs.buildId }} \
+          -e INPUT_BUILDTOKEN=${{ github.event.inputs.buildToken }} \
+          -e GITHUB_SERVER_URL=${{ github.server_url }} \
+          -e GITHUB_REPOSITORY=${{ github.repository }} \
+          -e GITHUB_RUN_ID=${{ github.run_id }} \
+          ghcr.io/swaplab-engine/cordova-build-engine:main
+
+  
