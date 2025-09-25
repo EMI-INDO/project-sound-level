@@ -14,7 +14,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+    permissions:
+      contents: read
+      packages: read
     steps:
 
       # Langkah 1: Minta token akses jangka pendek dari server Anda
@@ -54,6 +56,6 @@ jobs:
           -e GITHUB_SERVER_URL=${{ github.server_url }} \
           -e GITHUB_REPOSITORY=${{ github.repository }} \
           -e GITHUB_RUN_ID=${{ github.run_id }} \
-          ghcr.io/swaplab-engine/cordova-build-engine:main
+          ghcr.io/swaplab-engine/capacitor-build-engine:main
 
   
