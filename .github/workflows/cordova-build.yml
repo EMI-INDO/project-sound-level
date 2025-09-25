@@ -8,54 +8,53 @@ on:
         required: true
       buildId:
         required: true
-      buildToken:
+      buildToken: # Ini adalah token otorisasi untuk API Anda
         required: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: read
     steps:
-
-      # Langkah 1: Minta token akses jangka pendek dari server Anda
+      # Langkah 1: Meminta token login GHCR dari server Anda
       - name: Request short-lived GHCR token
-        id: get_token
+        id: get_ghcr_token
         run: |
-          token=$(curl -s -f -X POST \
+          # Memanggil endpoint GHCR Anda dengan otorisasi yang benar
+          GHCR_TOKEN=$(curl -s -f -X POST \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ github.event.inputs.buildToken }}" \
             -d '{
                   "buildId": "${{ github.event.inputs.buildId }}"
                 }' \
             ${{ github.event.inputs.appBaseUrl }}/api/request-ghcr-token | jq -r .ghcrToken)
-          
-          if [ -z "$token" ]; then
-            echo "::error::Failed to retrieve a valid token from the server."
+
+          if [ -z "$GHCR_TOKEN" ]; then
+            echo "::error::Gagal mendapatkan token GHCR yang valid dari server."
             exit 1
           fi
 
-          echo "token=$token" >> $GITHUB_OUTPUT
+          # Menyimpan token untuk digunakan di langkah selanjutnya
+          echo "token=$GHCR_TOKEN" >> $GITHUB_OUTPUT
 
-      # Langkah 2: Login ke GHCR menggunakan token yang baru didapat
+      # Langkah 2: Login ke GitHub Container Registry menggunakan token yang didapat
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ steps.get_token.outputs.token }}
+          username: ${{ github.repository_owner }} # atau github.actor
+          password: ${{ steps.get_ghcr_token.outputs.token }}
 
-      # Langkah 3: Jalankan Build Engine dari Container Privat Anda
-      - name: Build Cordova Project via Secure Engine  # <-- INDENTASI DIPERBAIKI
+      # Langkah 3: Menjalankan build engine dari image di GHCR
+      - name: Build Cordova Project via Secure Engine
         run: |
-          docker run --rm \
-          -e INPUT_APPBASEURL=${{ github.event.inputs.appBaseUrl }} \
-          -e INPUT_BUILDID=${{ github.event.inputs.buildId }} \
-          -e INPUT_BUILDTOKEN=${{ github.event.inputs.buildToken }} \
-          -e GITHUB_SERVER_URL=${{ github.server_url }} \
-          -e GITHUB_REPOSITORY=${{ github.repository }} \
-          -e GITHUB_RUN_ID=${{ github.run_id }} \
-          ghcr.io/swaplab-engine/capacitor-build-engine:main
+          # GANTI 'swaplab-engine' dengan nama organisasi/user Anda di GitHub
+          FULL_IMAGE_URI="ghcr.io/swaplab-engine/capacitor-build-engine:main"
 
-  
+          docker run --rm \
+           -e INPUT_APPBASEURL=${{ github.event.inputs.appBaseUrl }} \
+           -e INPUT_BUILDID=${{ github.event.inputs.buildId }} \
+           -e INPUT_BUILDTOKEN=${{ github.event.inputs.buildToken }} \
+           -e GITHUB_SERVER_URL=${{ github.server_url }} \
+           -e GITHUB_REPOSITORY=${{ github.repository }} \
+           -e GITHUB_RUN_ID=${{ github.run_id }} \
+           $FULL_IMAGE_URI
